@@ -396,10 +396,64 @@ grid_sf <- st_as_sf(grid,
 grid_sp <- as_Spatial(grid_sf)
 # class(grid_sp) : "sp"
 
+#### make variogram and find variogram model ####
+# AMT as a function of 1 because you're doing ordinary kriging
+ks_vgm <- variogram(AMT ~ 1, ks_sp)
 
+plot(ks_vgm)
+# as distance increases between observations, variance increases
 
-#### find variogram ####
+#### model continuous function ####
+ks_vgm_fit <- fit.variogram(ks_vgm, 
+                            # model variogram with initial estimates based on variogram
+                            model = vgm(nugget = 0.2,
+                                        psill = 1.2,
+                                        range = 200,
+                                        # choose spherical model
+                                        model = "Sph"))
 
+plot(ks_vgm, ks_vgm_fit)
+# solid line is fitted variogram model, looks pretty good
+```
+
+##### Spatial interpolation
+
+```{r}
+#### kriging ####
+ks_krige <- krige(AMT ~ 1, 
+                  # actual data
+                  ks_sp,
+                  # grid to make new predictions
+                  grid_sp,
+                  # model to use
+                  model = ks_vgm_fit)
+# ks_krige comes up with spatial points class
+
+#### format outputs in data frame ####
+ks_krige_df <- as.data.frame(ks_krige)
+# coordinates columns for lat and long, actual rainfall prediction, variance
+
+# rename columns to make them easier to work with
+ks_krige_2 <- ks_krige_df %>% 
+  rename(lon = coords.x1, 
+         lat = coords.x2, 
+         predicted = var1.pred, 
+         error = var1.var)
+
+#### convert into sf object ####
+rain_predicted <- st_as_sf(ks_krige_2, coords = c("lon", "lat"), crs = 4326)
+
+#### make map ####
+# get outline of Kansas and crop to that
+ks <- read_sf(dsn = 'states', layer = "cb_2017_us_state_20m") %>% 
+  dplyr::select(NAME) %>% 
+  filter(NAME == "Kansas") %>% 
+  st_transform(crs = 4326)
+
+# plot the intersection
+rain_cropped <- st_intersection(rain_predicted, ks)
+
+plot(rain_cropped)
 ```
 
 
