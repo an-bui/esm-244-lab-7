@@ -370,7 +370,37 @@ tm_shape(ks_counties) +
   tm_dots("AMT", size = 0.5)
 ```
 
+```{r}
+#### convert to spatial points dataframe ####
+ks_sp <- as_Spatial(ks_sf)
+# class(ks_sp) : "sp"
 
+#### get information into format that R likes ####
+
+#### create grid over which to find predicted values ####
+# make sequence of latitudes and longitudes based on lat long bounds of Kansas
+lat <- seq(37, 40, length.out = 200)
+long <- seq(-94.6, -102, length.out = 200)
+
+# make R identify vectors as a grid
+grid <- expand.grid(lon = long, lat = lat)
+
+# convert into sf object with coordinates
+grid_sf <- st_as_sf(grid, 
+                    # long, then lat
+                    coords = c("lon", "lat"), 
+                    # projection
+                    crs = 4326)
+
+# convert back to spatial values data frame to work with kriging
+grid_sp <- as_Spatial(grid_sf)
+# class(grid_sp) : "sp"
+
+
+
+#### find variogram ####
+
+```
 
 
 
