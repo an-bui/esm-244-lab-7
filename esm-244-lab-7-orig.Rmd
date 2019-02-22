@@ -200,6 +200,132 @@ suit_hab <- mask(sst_hab, par_hab)
 plot(suit_hab)
 ```
 
+#### Part 2. Point pattern analysis using red tree vole data
+
+```{r}
+# get all observations of voles from Humboldt County
+voles <- read_sf(dsn = 'redtreevoledata', layer = "ds033") %>% 
+  dplyr::select(COUNTY) %>% 
+  filter(COUNTY == "HUM") %>% 
+  # already has projection to transform
+  st_transform(crs = 4326)
+
+plot(voles)
+
+# get Humboldt County outline from CA county shape file
+humboldt <- read_sf(dsn = 'redtreevoledata', layer = "california_county_shape_file") %>% 
+  filter(NAME == "Humboldt") %>% 
+  dplyr::select(NAME)
+
+# doesn't come with its own projection, so need to create crs from scratch
+st_crs(humboldt) <- 4326
+
+plot(humboldt)
+
+tm_shape(humboldt) +
+  tm_fill() +
+  tm_shape(voles) +
+  tm_dots(size = 0.2)
+
+# try with ggplot
+ggplot() +
+  geom_sf(data = humboldt) +
+  geom_sf(data = voles)
+# polygon edge not found?????
+```
+
+##### Explore point patterns
+
+* Quadrat analysis
+* distance based (neighbor analysis, G-function and K-function)
+
+```{r}
+# convert voles information from sf object to spatial object to point pattern object
+voles_sp <- as(voles, 'Spatial')
+# class(voles_sp) : "sp"
+# class(voles) : "sf"
+voles_ppp <- as(voles_sp, "ppp")
+# class(voles_ppp) : "ppp"
+
+# set a bounding window of Humboldt County
+humboldt_sp <- as(humboldt, 'Spatial')
+humboldt_win <- as(humboldt_sp, "owin")
+# class(humboldt_win) : "owin" - outer window
+
+# combine into points and windows
+voles_pb <- ppp(voles_ppp$x, voles_ppp$y, window = humboldt_win)
+
+plot(voles_pb)
+```
+
+Try a quadrat test.
+```{r}
+# get voles data, choose number of columns and rows in each direction
+vole_qt <- quadrat.test(voles_pb, nx = 5, ny = 10)
+
+# null hypothesis of spatial evenness (although you will hear it called a test for "CSR") 
+vole_qt
+# events DO NOT reflect spatial evenness
+
+# run both together to superimpose
+plot(voles_pb)
+plot(vole_qt, add = TRUE, cex = 0.5)
+```
+
+Plot kernel densities for spatial data.
+
+```{r}
+point_density <- density(voles_pb, sigma = 0.02)
+
+plot(point_density)
+
+# bandwidth changes will lead to different outcomes, completely dependent on what your decision is
+# always report bandwidth with spatial density plot
+```
+
+```{r}
+#### create a raster for voles ####
+vole_raster <- raster(point_density, crs = wgs84)
+
+tm_shape(vole_raster) +
+  tm_raster()
+```
+
+Nearest neighbor:
+
+- G-function: considers distance of each observation to nearest neighbor
+    - simple mathematically, but oversimplifies how points are distributed because considers observations to nearest neighbor (and not some centralized point)
+- K-function: considers how close all neighboring observations are to an event (concentric circles)
+
+```{r g function}
+#### create sequence of distances to calculate proportions ####
+# just try that shit out to find the right sequence
+r <- seq (0, 0.15, by = 0.005)
+
+#### use gestimate function in envelope wrapper ####
+# function = Gest
+# r = r sequence
+# nsim = 20 = number of Monte Carlo iterations
+gfunction <- envelope(voles_pb, fun = Gest, r = r, nsim = 20)
+
+# plot observed values as a function of r
+plot(gfunction$obs ~ gfunction$r, 
+     # line graph
+     type = "l",
+     col = "black")
+# plot theoretical values as function of r
+lines(gfunction$theo ~ gfunction$r,
+      type = "l",
+      col = "red")
+# looks like data are more clustered than CSR
+```
+
+```{r k function}
+
+```
+
+
+
 
 
 
