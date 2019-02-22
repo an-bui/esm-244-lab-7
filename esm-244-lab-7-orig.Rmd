@@ -321,10 +321,54 @@ lines(gfunction$theo ~ gfunction$r,
 ```
 
 ```{r k function}
+# look at bigger space because you're considering multiple neighbors
+r2 <- seq(0, 0.5, by = 0.05)
 
+# global = TRUE for entire study area window
+lfunction <- envelope(voles_pb, fun = Lest, r = r2, nsim = 20, global = TRUE)
+
+plot(lfunction$obs ~ lfunction$r, type = "l", col = "blue")
+lines(lfunction$theo ~ lfunction$r, type = "l", col = "red")
+# evidence for clustering
+```
+
+##### Diggle-Cressie-Loosmore-Ford test of CSR: statistical test for complete spatial randomness
+
+```{r}
+DCLFTest <- dclf.test(voles_pb, nsim = 30)
+DCLFTest
+# p-value = 0.03226
+# significantly different from complete spatial randomness
+# with tons of events, they'll be different from CSR even if it's not meaningful because of the statistical power
+# with too few, you'll find something different from CSR even if it's not real
 ```
 
 
+#### Part 3. Spatial interpolation by kriging
+
+```{r}
+#### rainfall data ####
+# read in data, has lat and long column
+ks_rain <- read_csv("KSRain2.csv")
+# convert to simple features data in sf package
+ks_sf <- st_as_sf(ks_rain, 
+                  # give in order of longitude, then latitude
+                  coords = c("LON", "LAT"),
+                  # name CRS
+                  crs = 4326)
+plot(ks_sf)
+
+#### kansas counties ####
+ks_counties <- read_sf(dsn = 'KSCounties', layer = "ks_counties_shapefile")
+st_crs(ks_counties) <- 4326
+plot(ks_counties)
+
+tm_shape(ks_counties) +
+  tm_fill() +
+  tm_shape(ks_sf) +
+  # choose desired attribute
+  tm_dots("AMT", size = 0.5)
+```
 
 
 
